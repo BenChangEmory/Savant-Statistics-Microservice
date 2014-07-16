@@ -1,0 +1,12 @@
+logging:
+  level: DEBUG
+
+
+
+server:
+  applicationConnectors:
+    - type: http
+      port: 7180
+  adminConnectors:
+    - type: http
+      port: 7181
