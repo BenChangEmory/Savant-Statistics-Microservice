@@ -1,14 +1,12 @@
 package collector.service;
 
 import collector.domain.TimeEntry;
+import collector.domain.Timeslices;
 import com.mongodb.*;
 import org.bson.types.BSONTimestamp;
 import org.bson.types.ObjectId;
-import org.jongo.Jongo;
 import org.jongo.MongoCollection;
 import org.springframework.beans.factory.InitializingBean;
-
-import java.net.UnknownHostException;
 
 /**
  * Created by benjamin on 6/30/14.
@@ -16,6 +14,8 @@ import java.net.UnknownHostException;
 
 public class OplogDataCollector implements InitializingBean {
 
+
+    DbConfig dbConfig = new DbConfig();
 
     //configurable fields
     int destinationPort = 27017;
@@ -32,16 +32,16 @@ public class OplogDataCollector implements InitializingBean {
     String monitoredField  = "deliveryProfileCode";
 
     public void collectData(String filterToDbCollection) throws Exception{
-    //public static void main(String[] args) throws Exception{
+        //public static void main(String[] args) throws Exception{
         try {
             //Fields for time frame
             long timeStart = 0l;//1405522955290l; //sorted by createdDtm
             long timeEnd;
 
-            MongoCollection oplogUpdates = useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
-            MongoCollection timeSliceData = useJongo(destinationHost, destinationPort, destinationDb, destinationTimeSliceCol);
-            MongoCollection tsData = useJongo(destinationHost, destinationPort, destinationDb, tsInformation);
-            DBCollection sourceCol = useDBCollection(sourceHost, sourcePort, sourceDb, sourceOplog);
+            MongoCollection oplogUpdates = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
+            MongoCollection timeSliceData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationTimeSliceCol);
+            MongoCollection tsData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, tsInformation);
+            DBCollection sourceCol = dbConfig.useDBCollection(sourceHost, sourcePort, sourceDb, sourceOplog);
 
             //filter and create cursor
             BasicDBObject query = new BasicDBObject();
@@ -50,13 +50,13 @@ public class OplogDataCollector implements InitializingBean {
 
             Iterable<TimeEntry> obj = tsData.find().limit(1).as(TimeEntry.class);
             ObjectId startId = null;
-            BSONTimestamp startTs;
+            BSONTimestamp startTs = null;
             if(obj.iterator().hasNext()) {
                 TimeEntry entry = obj.iterator().next();
                 startId = entry.getId();
                 startTs = entry.getTs();
             }
-            startTs = new BSONTimestamp(1405515243, 11);
+            //startTs = new BSONTimestamp(1405515243, 11);
             query.put("ts", new BasicDBObject("$gt", startTs));
 
             DBCursor cursor = sourceCol.find(query).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA).addOption(Bytes.QUERYOPTION_NOTIMEOUT);
@@ -65,8 +65,10 @@ public class OplogDataCollector implements InitializingBean {
             int cursorCount = 0;
             while(true){
                 System.out.println("reading data");
-                System.out.println(cursor.count());
-                long avg = 0l;
+                System.out.println(cursor.count() + " initial objects to read");
+                System.out.println("----------------------------------");
+                System.out.println();
+                long sum = 0l;
                 while (cursor.hasNext()) {
                     long before = System.currentTimeMillis();
 
@@ -74,10 +76,10 @@ public class OplogDataCollector implements InitializingBean {
                     cursorCount++;
                     System.out.println("updating... ");
                     System.out.println("action number: " + cursorCount);
-                    System.out.println();
 
                     //store data with cursor
                     BasicDBObject doc = (BasicDBObject)cursor.next();
+
                     //Long statusCreatedDtm = (Long)((BasicDBObject) (((BasicDBObject) doc.get("o")).get("status"))).get("createdDtm");
                     ObjectId id = (ObjectId)((BasicDBObject) doc.get("o")).get("_id");
                     Long createdDtm = (Long)((BasicDBObject) doc.get("o")).get("createdDtm");
@@ -92,7 +94,7 @@ public class OplogDataCollector implements InitializingBean {
 
                     //update oplogUpdates
                     oplogUpdates.update("{'_id': #}", id).upsert()
-                           .with("{$set: {createdDtm: #, monitoredField: #}}", createdDtm, newMonitoredField);
+                            .with("{$set: {createdDtm: #, monitoredField: #}}", createdDtm, newMonitoredField);
                     //update timesliceData
                     for(Timeslices slice: Timeslices.values()) {
                         long increments = slice.value;
@@ -121,11 +123,22 @@ public class OplogDataCollector implements InitializingBean {
                         System.out.println("ready to read new information");
                     }
                     long after = System.currentTimeMillis();
-                    long x = (after-before)/1000;
-                    System.out.println("processed in "+x+" seconds");
-                    avg += x;
-                    avg /= cursor.count();
+                    long x = (after-before);
+                    System.out.println("processed in "+x+" milliseconds");
+                    sum += x;
+                    long avg = sum/cursorCount;
                     System.out.println("average milliseconds "+avg);
+                    if(cursorCount%20 == 0){
+                        long timeLeft = (cursor.count() - cursorCount);
+                        timeLeft *= avg;
+                        timeLeft /= 1000;
+                        timeLeft /= 60;
+                        System.out.println("time remaining " + timeLeft + " minutes");
+                    }
+                    System.out.println();
+                    System.out.println();
+
+
                 }
             }
         }  catch (MongoException e) {
@@ -133,36 +146,11 @@ public class OplogDataCollector implements InitializingBean {
         }
     }
 
-    private MongoCollection useJongo(String Host, int Port, String Db, String Col) throws UnknownHostException {
-        MongoClient mongoClient = new MongoClient(Host, Port);
-        DB db = mongoClient.getDB(Db);
-        Jongo jongo = new Jongo(db);
-        MongoCollection mongoCollection = jongo.getCollection(Col);
-        return mongoCollection;
-    }
 
-    private DBCollection useDBCollection(String Host, int Port, String Db, String Col) throws UnknownHostException {
-        MongoClient mongoClient = new MongoClient(Host, Port);
-        DB db = mongoClient.getDB(Db);
-        DBCollection dbCollection = db.getCollection(Col);
-        return dbCollection;
-    }
 
     @Override
     public void afterPropertiesSet() throws Exception{
     }
 
-    public enum Timeslices {
-        FIVE_MINUTES(300000l),
-        TEN_MINUTES(600000l),
-        THIRTY_MINUTES(1800000l),
-        ONE_HOUR(3600000l),
-        ONE_DAY(86400000l);
-
-        private long value;
-        private Timeslices(long value){
-            this.value = value;
-        }
-    };
 
 }
