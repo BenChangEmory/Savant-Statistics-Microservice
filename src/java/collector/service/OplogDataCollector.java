@@ -24,8 +24,8 @@ public class OplogDataCollector implements InitializingBean {
     String sourceHost = "10.0.0.151";
     String destinationDb = "savant";
     String sourceDb = "local";
-    String destinationOplogInfoCol = "storedOplogInformation";
-    String destinationTimeSliceCol = "storedTimeSliceData";
+    String destinationOplogInfoCol = "generalInfo";
+    String destinationTimeSliceCol = "graphData";
     String sourceOplog = "oplog.rs";
     String tsInformation = "ts";
     //Field to monitor
@@ -38,8 +38,8 @@ public class OplogDataCollector implements InitializingBean {
             long timeStart = 0l;//1405522955290l; //sorted by createdDtm
             long timeEnd;
 
-            MongoCollection oplogUpdates = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
-            MongoCollection timeSliceData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationTimeSliceCol);
+            MongoCollection generalInfo = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
+            MongoCollection graphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationTimeSliceCol);
             MongoCollection tsData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, tsInformation);
             DBCollection sourceCol = dbConfig.useDBCollection(sourceHost, sourcePort, sourceDb, sourceOplog);
 
@@ -57,7 +57,7 @@ public class OplogDataCollector implements InitializingBean {
                 startTs = entry.getTs();
             }
             //startTs = new BSONTimestamp(1405515243, 11);
-            query.put("ts", new BasicDBObject("$gt", startTs));
+            query.put("ts", new BasicDBObject("$gte", startTs));
 
             DBCursor cursor = sourceCol.find(query).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA).addOption(Bytes.QUERYOPTION_NOTIMEOUT);
 
@@ -69,11 +69,30 @@ public class OplogDataCollector implements InitializingBean {
                 System.out.println("----------------------------------");
                 System.out.println();
                 long sum = 0l;
+                long after = 0l;
+                long before = 0l;
                 while (cursor.hasNext()) {
-                    long before = System.currentTimeMillis();
+                    cursorCount++;
+                    if(cursorCount != 1){
+
+                        after = System.currentTimeMillis();
+                        long x = (after-before);
+                        System.out.println("processed in "+x+" milliseconds");
+                        sum += x;
+                        long avg = sum/(cursorCount-1);
+                        System.out.println("average milliseconds "+avg);
+                        if(cursorCount%20 == 0){
+                            long timeLeft = (cursor.count() - cursorCount);
+                            timeLeft *= avg;
+                            timeLeft /= 1000;
+                            timeLeft /= 60;
+                            System.out.println("time remaining " + timeLeft + " minutes");
+                        }
+                    }
+
+                    before = System.currentTimeMillis();
 
                     timeEnd = System.currentTimeMillis();
-                    cursorCount++;
                     System.out.println("updating... ");
                     System.out.println("action number: " + cursorCount);
 
@@ -93,7 +112,7 @@ public class OplogDataCollector implements InitializingBean {
 
 
                     //update oplogUpdates
-                    oplogUpdates.update("{'_id': #}", id).upsert()
+                    generalInfo.update("{'_id': #}", id).upsert()
                             .with("{$set: {createdDtm: #, monitoredField: #}}", createdDtm, newMonitoredField);
                     //update timesliceData
                     for(Timeslices slice: Timeslices.values()) {
@@ -101,9 +120,9 @@ public class OplogDataCollector implements InitializingBean {
                         for (long currentTimeSegment = timeStart; currentTimeSegment < timeEnd; currentTimeSegment += increments) {
                             if (createdDtm != null) {
                                 if (createdDtm >= currentTimeSegment && createdDtm < currentTimeSegment + increments) {
-                                    timeSliceData.update("{'slice': #,'group.status': #, 'group.client': #, 'group.deliveryProfile': #, 'size': #}",
+                                    graphData.update("{'slice': #,'group': {status': #, 'client': #, 'deliveryProfile': #}, 'size': #}",
                                             currentTimeSegment, statusCode, clientId, deliveryProfileCode, slice.name())
-                                            .upsert().with("{$inc: {count: 1}}");
+                                            .multi().upsert().with("{$inc: {count: 1}}");
                                 }
                             }
                         }
@@ -119,21 +138,9 @@ public class OplogDataCollector implements InitializingBean {
                     else {
                         tsData.update("{_id: #}", startId).upsert().with("{$set: {ts: #}}", ts);
                     }
+
                     if(cursorCount == cursor.count()) {
                         System.out.println("ready to read new information");
-                    }
-                    long after = System.currentTimeMillis();
-                    long x = (after-before);
-                    System.out.println("processed in "+x+" milliseconds");
-                    sum += x;
-                    long avg = sum/cursorCount;
-                    System.out.println("average milliseconds "+avg);
-                    if(cursorCount%20 == 0){
-                        long timeLeft = (cursor.count() - cursorCount);
-                        timeLeft *= avg;
-                        timeLeft /= 1000;
-                        timeLeft /= 60;
-                        System.out.println("time remaining " + timeLeft + " minutes");
                     }
                     System.out.println();
                     System.out.println();

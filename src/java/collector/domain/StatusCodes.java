@@ -22,6 +22,7 @@ public enum StatusCodes {
     STATUS_QC_SUCCESSFUL,
     STATUS_QC_UNKNOWN;
 
+    public static final int size = StatusCodes.values().length;
     @Override
     public String toString() {
         switch(this) {
@@ -62,6 +63,7 @@ public enum StatusCodes {
             default:
                 return null;
         }
+
     }
 
 
