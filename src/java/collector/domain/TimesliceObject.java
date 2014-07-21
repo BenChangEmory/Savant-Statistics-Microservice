@@ -25,6 +25,16 @@ public class TimesliceObject {
         return id;
     }
 
+    public TimesliceObject(){}
+
+    public TimesliceObject(ObjectId id, int count, Map<String, String> group, String size, long slice) {
+        this.id = id;
+        this.count = count;
+        this.group = group;
+        this.size = size;
+        this.slice = slice;
+    }
+
     public void setId(ObjectId id) {
         this.id = id;
     }

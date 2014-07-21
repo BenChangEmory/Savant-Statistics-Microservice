@@ -35,7 +35,7 @@ public class OplogDataCollector implements InitializingBean {
         //public static void main(String[] args) throws Exception{
         try {
             //Fields for time frame
-            long timeStart = 0l;//1405522955290l; //sorted by createdDtm
+            long timeStart = 0l;
             long timeEnd;
 
             MongoCollection generalInfo = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
@@ -56,10 +56,11 @@ public class OplogDataCollector implements InitializingBean {
                 startId = entry.getId();
                 startTs = entry.getTs();
             }
-            //startTs = new BSONTimestamp(1405515243, 11);
-            query.put("ts", new BasicDBObject("$gte", startTs));
+            //startTs = new BSONTimestamp(1405954969, 36);
+            query.put("ts", new BasicDBObject("$gt", startTs));
 
-            DBCursor cursor = sourceCol.find(query).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA).addOption(Bytes.QUERYOPTION_NOTIMEOUT);
+            DBCursor cursor = sourceCol.find(query).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA)
+                    .addOption(Bytes.QUERYOPTION_NOTIMEOUT).addOption(Bytes.QUERYOPTION_OPLOGREPLAY);
 
             //todo take out all cursorCounts
             int cursorCount = 0;
@@ -113,16 +114,34 @@ public class OplogDataCollector implements InitializingBean {
 
                     //update oplogUpdates
                     generalInfo.update("{'_id': #}", id).upsert()
-                            .with("{$set: {createdDtm: #, monitoredField: #}}", createdDtm, newMonitoredField);
+                            .with("{$set: {createdDtm: #, "+ monitoredField +": #}}", createdDtm, newMonitoredField);
                     //update timesliceData
                     for(Timeslices slice: Timeslices.values()) {
                         long increments = slice.value;
                         for (long currentTimeSegment = timeStart; currentTimeSegment < timeEnd; currentTimeSegment += increments) {
                             if (createdDtm != null) {
                                 if (createdDtm >= currentTimeSegment && createdDtm < currentTimeSegment + increments) {
-                                    graphData.update("{'slice': #,'group': {status': #, 'client': #, 'deliveryProfile': #}, 'size': #}",
+                                    graphData.update("{'slice': #,'group': {status: #, 'client': #, 'deliveryProfile': #}, 'size': #}",
                                             currentTimeSegment, statusCode, clientId, deliveryProfileCode, slice.name())
-                                            .multi().upsert().with("{$inc: {count: 1}}");
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {status: #, 'client': #}, 'size': #}",
+                                            currentTimeSegment, statusCode, clientId,  slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {status: #, 'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, statusCode, deliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {'client': #, 'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, clientId, deliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {'client': #}, 'size': #}",
+                                            currentTimeSegment, clientId, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, deliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    graphData.update("{'slice': #,'group': {status: #}, 'size': #}",
+                                            currentTimeSegment, statusCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
                                 }
                             }
                         }
