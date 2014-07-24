@@ -14,9 +14,7 @@ import javax.ws.rs.core.MediaType;
 
 @Component
 @Path("/request")
-@Produces(MediaType.TEXT_PLAIN)
 @Api(value = "/request", description = "Requesting count for db")
-
 public class RequestResource {
 
 
