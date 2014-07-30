@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="shortcut icon" href="file:///home/benjamin/Desktop/chart.ico">
+    <base href="http://demos.telerik.com/kendo-ui/dropdownlist/remotedatasource">
+    <style>
+        html {
+        font-size: 12px;
+        font-family: Arial, Helvetica, sans-serif;
+        }
+    </style>
+    <title>savant</title>
+    <link href="http://cdn.kendostatic.com/2014.2.716/styles/kendo.common.min.css" rel="stylesheet" />
+    <link href="http://cdn.kendostatic.com/2014.2.716/styles/kendo.default.min.css" rel="stylesheet" />
+    <link href="http://cdn.kendostatic.com/2014.2.716/styles/kendo.dataviz.min.css" rel="stylesheet" />
+    <link href="http://cdn.kendostatic.com/2014.2.716/styles/kendo.dataviz.default.min.css" rel="stylesheet" />
+    <script src="http://cdn.kendostatic.com/2014.2.716/js/jquery.min.js"></script>
+    <script src="http://cdn.kendostatic.com/2014.2.716/js/angular.min.js"></script>
+    <script src="http://cdn.kendostatic.com/2014.2.716/js/kendo.all.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.7.0/moment.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/datejs/1.0/date.min.js"></script>
+
+</head>
+
+<body>
+<div>
+    <div id="chart">
+    </div>
+    <div id="timeSizes" class="box-col" style="float:right;width: 300px">
+        <h4>Time Segment Size</h4>
+        <input name="size" type="radio" value="ONE_DAY" checked/>
+        <label>One Day (Default)</label>
+        <br>
+        <input name="size" type="radio" value="ONE_HOUR" />
+        <label>One Hour</label>
+        <br>
+        <input name="size" type="radio" value="THIRTY_MINUTES" />
+        <label>Thirty Minutes</label>
+        <br>
+        <input name="size" type="radio" value="TEN_MINUTES" />
+        <label>Ten Minutes</label>
+        <br>
+        <input name="size" type="radio" value="FIVE_MINUTES" />
+        <label>Five Minutes</label>
+        <br>
+    </div>
+    <div id="dates" class="box-col" style="float:left">
+        <h4>Select start and end date:</h4>
+        <p>
+            <label for="start">Start date:</label>
+            <input id="start" style="width: 200px" />
+        </p>
+        <p>
+            <label for="end">End date:</label>
+            <input id="end" style="width: 200px" />
+        </p>
+    </div>
+    <div id="multiselect" style="float:right">
+        <h4><center>Clients</center></h4>
+        <select id="clients" multiple="multiple" data-placeholder="Select clients...">
+            <option selected>correspondence</option>
+            <option selected>implementer</option>
+            <option selected>MAITRED</option>
+            <option selected>OCN</option>
+            <option selected>ocwen</option>
+            <option selected>rt-dvs</option>
+        </select>
+        <h4><center>Delivery Profiles</center></h4>
+        <select id="profiles" multiple="multiple" data-placeholder="Select delivery profiles...">
+            <option selected>FABIANA01</option>
+            <option selected>SRVD</option>
+        </select>
+    </div>
+</div>
+<div>
+<script>
+            $(document).ready(function() {
+                $(document).ready(createChart);
+                // setInterval(function() {
+                //     softRefresh();
+                // }, 5000);
+
+                function softRefresh() {
+                    if (listOfClients.value().toString() != "" && listOfProfiles.value().toString() != "") {
+                        dataSource.read();
+                    } else {
+                        alert("error");
+                    }
+                }
+
+                function fullRefresh() {
+                    adjustAxisLabels();
+                    postString = size + "/" + startDateUnix + "/" + endDateUnix + "/" + listOfClients.value().toString() + "/" + listOfProfiles.value().toString();
+                    softRefresh();
+                    createChart();
+                }
+
+                function adjustAxisLabels() {
+                    var maxTicks = 15;
+                    var totalTicks = (endDateUnix - startDateUnix) / baseUnitStepUnix;
+                    var displayedTicks = totalTicks;
+                    labelStep = 1;
+                    while (displayedTicks > maxTicks) {
+                        labelStep++;
+                        displayedTicks = totalTicks / labelStep;
+                    }
+                }
+
+
+                function createChart() {
+                    $("#chart").kendoChart({
+                        title: {
+                            text: "REALDoc Statistics"
+                        },
+                        theme: "blueopal",
+                        dataSource: dataSource,
+                        transitions: false,
+                        series: [{
+                            type: "line",
+                            style: "smooth",
+                            field: "count",
+                            categoryField: "slice",
+                            aggregate: "sum"
+                        }],
+                        categoryAxis: {
+                            min: start.value(),
+                            max: end.value(),
+                            majorGridLines: {
+                                visible: false
+                            },
+                            majorTicks: {
+                                visible: false
+                            },
+                            roundToBaseUnit: false,
+                            baseUnit: baseUnit,
+                            baseUnitStep: baseUnitStep,
+                            labels: {
+                                rotation: -70,
+                                dateFormats: {
+                                    minutes: "MM/dd HH:mm",
+                                    hours: "MM/dd HH:00",
+                                    days: "MM/dd",
+                                },
+                                step: labelStep
+                            },
+                        },
+                        valueAxis: {
+                            title: {
+                                text: "aggregate count"
+                            },
+                            majorGridLines: {
+                                visible: false
+                            },
+                            majorTicks: {
+                                visible: false
+                            }
+                        },
+                        tooltip: {
+                            visible: true,
+                            template: "#= series.name #: #= value #"
+                        }
+                    });
+                }
+
+                function startChange() {
+                    var startDate = start.value(),
+                        endDate = end.value();
+                    startDateUnix = Date.parse(startDate).getTime(),
+                        endDateUnix = Date.parse(endDate).getTime();
+                    if (startDate) {
+                        startDate = new Date(startDate);
+                        startDate.setDate(startDate.getDate());
+                        end.min(startDate);
+                    } else if (endDate) {
+                        start.max(new Date(endDate));
+                    } else {
+                        endDate = new Date();
+                        start.max(endDate);
+                        end.min(endDate);
+                    }
+                    fullRefresh();
+                }
+
+                function endChange() {
+                    var endDate = end.value(),
+                        startDate = start.value();
+                    startDateUnix = Date.parse(startDate).getTime(),
+                        endDateUnix = Date.parse(endDate).getTime();
+                    if (endDate) {
+                        endDate = new Date(endDate);
+                        endDate.setDate(endDate.getDate());
+                        start.max(endDate);
+                    } else if (startDate) {
+                        end.min(new Date(startDate));
+                    } else {
+                        endDate = new Date();
+                        start.max(endDate);
+                        end.min(endDate);
+                    }
+                    fullRefresh();
+                }
+
+
+                $('#timeSizes').on('click', function(event) {
+                    var $target = $(event.target);
+                    if ($target.is('input')) {
+                        size = $target.attr('value');
+                        if (size == "ONE_DAY") {
+                            baseUnit = "days";
+                            baseUnitStep = 1,
+                                baseUnitStepUnix = 86400000;
+                        }
+                        if (size == "ONE_HOUR") {
+                            baseUnit = "hours";
+                            baseUnitStep = 1,
+                                baseUnitStepUnix = 3600000;
+                        }
+                        if (size == "THIRTY_MINUTES") {
+                            baseUnit = "minutes";
+                            baseUnitStep = 30,
+                                baseUnitStepUnix = 1800000;
+                        }
+                        if (size == "TEN_MINUTES") {
+                            baseUnit = "minutes";
+                            baseUnitStep = 10,
+                                baseUnitStepUnix = 600000;
+                        }
+                        if (size == "FIVE_MINUTES") {
+                            baseUnit = "minutes";
+                            baseUnitStep = 5,
+                                baseUnitStepUnix = 300000;
+                        }
+                        fullRefresh();
+                    }
+                });
+
+                $('#multiselect').on('change', function(event) {
+                    fullRefresh();
+                });
+
+
+                var baseUnitStep = 1,
+                    baseUnitStepUnix = 86400000,
+                    labelStep = 1,
+                    baseUnit = "days";
+
+                var today = moment().endOf('day').toDate(),
+                    lastWeek = moment().startOf('day').subtract('days', 7).toDate();
+
+                var start = $("#start").kendoDateTimePicker({
+                        value: lastWeek,
+                        change: startChange,
+                        parseFormats: ["MM/dd/yyyy"]
+                    }).data("kendoDateTimePicker"),
+                    end = $("#end").kendoDateTimePicker({
+                        value: today,
+                        change: endChange,
+                        parseFormats: ["MM/dd/yyyy"]
+                    }).data("kendoDateTimePicker");
+
+                start.max(end.value());
+                end.min(start.value());
+
+                var radios = document.getElementsByName('size');
+                for (var i = 0, length = radios.length; i < length; i++) {
+                    if (radios[i].checked) {
+                        var size = radios[i].value,
+                            startDateUnix = Date.parse(start.value()).getTime(),
+                            endDateUnix = Date.parse(end.value()).getTime();
+                        break;
+                    }
+                }
+
+                var listOfClients = $("#clients").kendoMultiSelect().data("kendoMultiSelect");
+                var listOfProfiles = $("#profiles").kendoMultiSelect().data("kendoMultiSelect");
+
+                var postString = size + "/" + startDateUnix + "/" + endDateUnix + "/" + listOfClients.value().toString() + "/" + listOfProfiles.value().toString();
+                var dataSource = new kendo.data.DataSource({
+                    transport: {
+                        read: function(options) {
+                            $.post("http://localhost:7180/statistics", postString, function(result) {
+                                options.success(result);
+                            });
+                        }
+                    },
+                    group: {
+                        field: "group.status"
+                    },
+                    schema: {
+                        model: {
+                            fields: {
+                                slice: {
+                                    type: "date",
+                                    parse: function(value) {
+                                        return new Date(value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+        </script>
+</div>
+</body>
+
+</html>

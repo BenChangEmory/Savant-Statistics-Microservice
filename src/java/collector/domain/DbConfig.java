@@ -1,4 +1,4 @@
-package collector.service;
+package collector.domain;
 
 import com.mongodb.DB;
 import com.mongodb.DBCollection;

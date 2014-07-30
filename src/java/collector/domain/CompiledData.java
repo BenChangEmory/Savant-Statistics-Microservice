@@ -1,6 +1,5 @@
 package collector.domain;
 
-import collector.service.DbConfig;
 import org.jongo.MongoCollection;
 import org.springframework.stereotype.Component;
 
@@ -16,157 +15,72 @@ import java.util.Map;
 
 @Component
 public class CompiledData {
-        int port = 27017;
-        String host = "localhost";
-        String db = "savant";
-        String col = "graphData";
-        DbConfig dbConfig = new DbConfig();
 
-        public List<TimesliceObject> getByProfileAndStatus(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> dProfiles = fetchProfiles(dataCol);
-            Map<String, String> statuses = fetchStatuses(dataCol);
-            for (String profile : dProfiles.values()) {
-                for (String status : statuses.values()) {
-                    Iterable<TimesliceObject> obj = dataCol.find("{group:{status: #, deliveryProfile: #}, 'size': #}"
-                            , status, profile, size).as(TimesliceObject.class);
-                    for (TimesliceObject allData : obj) {
-                        list.add(allData);
-                    }
-                }
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByProfileAndClient(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
+    private int port = 27017;
+    private String host = "localhost";
+    private String db = "savant";
+    private String col = "graphData";
+    private DbConfig dbConfig = new DbConfig();
 
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> dProfiles = fetchProfiles(dataCol);
-            Map<String, String> clients = fetchClients(dataCol);
-            for (String profile : dProfiles.values()) {
-                for (String client : clients.values()) {
-                    Iterable<TimesliceObject> obj = dataCol.find("{group:{client: #, deliveryProfile: #}, 'size': #}"
-                            ,client, profile, size).as(TimesliceObject.class);
-                    for (TimesliceObject allData : obj) {
-                        list.add(allData);
-                    }
-
-                }
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByStatusAndClient(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> statuses = fetchStatuses(dataCol);
-            Map<String, String> clients = fetchClients(dataCol);
-            for (String status : statuses.values()) {
-                for (String client : clients.values()) {
-                    Iterable<TimesliceObject> obj = dataCol.find("{group:{status: #, client: #}, 'size': #}"
-                            ,status, client, size).as(TimesliceObject.class);
-                    for (TimesliceObject allData : obj) {
-                        list.add(allData);
-                    }
-                }
-
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByStatus(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> statuses = fetchStatuses(dataCol);
-            for (String status : statuses.values()) {
-                Iterable<TimesliceObject> obj = dataCol.find("{group:{status: #}, 'size': #}"
-                        ,status, size).as(TimesliceObject.class);
-                for (TimesliceObject allData : obj) {
-                    list.add(allData);
-
-                }
-
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByClient(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> clients = fetchClients(dataCol);
-            for (String client : clients.values()) {
-                Iterable<TimesliceObject> obj = dataCol.find("{group:{client: #}, 'size': #}"
-                        ,client, size).as(TimesliceObject.class);
-                for (TimesliceObject allData : obj) {
-                    list.add(allData);
-                }
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByProfile(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> dProfiles = fetchProfiles(dataCol);
-            for (String profile : dProfiles.values()) {
-                Iterable<TimesliceObject> obj = dataCol.find("{group:{deliveryProfile: #}, 'size': #}"
-                        ,profile, size).as(TimesliceObject.class);
-                for (TimesliceObject allData : obj) {
-                    list.add(allData);
-                }
-            }
-            return list;
-        }
-        public List<TimesliceObject> getByAll(String size) throws UnknownHostException {
-            List<TimesliceObject> list = new ArrayList<TimesliceObject>();
-
-            MongoCollection dataCol = dbConfig.useJongo(host, port, db, col);
-            Map<String, String> dProfiles = fetchProfiles(dataCol);
-            Map<String, String> statuses = fetchStatuses(dataCol);
-            Map<String, String> clients = fetchClients(dataCol);
-            for (String profile : dProfiles.values()) {
-                for (String status : statuses.values()) {
-                    for (String client : clients.values()) {
-                        Iterable<TimesliceObject> obj = dataCol.find("{group:{status: #, client: #, deliveryProfile: #}, 'size': #}"
-                                ,status, client, profile, size).as(TimesliceObject.class);
-                        for (TimesliceObject allData : obj) {
-                            //TimesliceObject fixed = new TimesliceObject();
-                            list.add(allData);
+        public List<TimesliceObject> getData(long startTimeInput, long endTimeInput, String sizeInput, String[] clientInput, String[] profileInput) throws UnknownHostException {
+            List<TimesliceObject> compiledData = new ArrayList<TimesliceObject>();
+            MongoCollection dataCollection = dbConfig.useJongo(host, port, db, col);
+            Map<String, String> allPossibleStatuses = fetchStatuses(dataCollection);
+            for(int i = 0; i < clientInput.length; i ++){
+                for(int j = 0; j< profileInput.length; j++){
+                    for (String status : allPossibleStatuses.values()) {
+                        if(status != null) {
+                            Iterable<TimesliceObject> jongoData = dataCollection.find("{slice: {$gte: #, $lt: #}, group:{status: #, client: #, deliveryProfile: #}, size: #}"
+                                    , startTimeInput, endTimeInput, status, clientInput[i], profileInput[j], sizeInput).as(TimesliceObject.class);
+                            for (TimesliceObject outputData : jongoData) {
+                                compiledData.add(outputData);
+                            }
                         }
                     }
                 }
             }
-            return list;
+            return compiledData;
+            /*Map<String, String> myClients = fetchClients(dataCol);
+            for (String client: myClients.values()){
+                System.out.println(client);
+            }
+            Map<String, String> myProfiles = fetchProfiles(dataCol);
+            for (String profile: myProfiles.values()){
+                System.out.println(profile);
+            }*/
         }
 
-        private Map<String, String> fetchClients(MongoCollection dataCol) {
-            Iterable<TimesliceObject> allClients = dataCol.find("{},{'group.client': #}", 1).as(TimesliceObject.class);
-            Map<String, String> clients = new HashMap<String, String>();
-            for (TimesliceObject ts : allClients) {
-                Map<String, String> group = ts.getGroup();
-                String client = group.get("client");
-                clients.put(client, client);
-            }
-            return clients;
+    Map<String, String> fetchStatuses(MongoCollection dataCol) {
+        Iterable<TimesliceObject> statusData = dataCol.find("{},{'group.status': #}", 1).as(TimesliceObject.class);
+        Map<String, String> compiledStatuses = new HashMap<String, String>();
+        for (TimesliceObject data : statusData) {
+            Map<String, String> group = data.getGroup();
+            String status = group.get("status");
+            compiledStatuses.put(status, status);
         }
+        return compiledStatuses;
+    }
 
-        Map<String, String> fetchStatuses(MongoCollection dataCol) {
-            Iterable<TimesliceObject> allStatuses = dataCol.find("{},{'group.status': #}", 1).as(TimesliceObject.class);
-            Map<String, String> statuses = new HashMap<String, String>();
-            for (TimesliceObject ts : allStatuses) {
-                Map<String, String> group = ts.getGroup();
-                String status = group.get("status");
-                statuses.put(status, status);
-            }
-            return statuses;
+    /*Map<String,String> fetchProfiles(MongoCollection dataCol) {
+        Iterable<TimesliceObject> allProfiles = dataCol.find("{},{'group.deliveryProfile': #}", 1).as(TimesliceObject.class);
+        Map<String, String> profiles = new HashMap<String, String>();
+        for (TimesliceObject ts : allProfiles) {
+            Map<String, String> group = ts.getGroup();
+            String status = group.get("deliveryProfile");
+            profiles.put(status, status);
         }
+        return profiles;
+    }
+    Map<String, String> fetchClients(MongoCollection dataCol) {
+        Iterable<TimesliceObject> allClients = dataCol.find("{},{'group.client': #}", 1).as(TimesliceObject.class);
+        Map<String, String> clients = new HashMap<String, String>();
+        for (TimesliceObject ts : allClients) {
+            Map<String, String> group = ts.getGroup();
+            String client = group.get("client");
+            clients.put(client, client);
+        }
+        return clients;
+    }*/
 
-        Map<String, String> fetchProfiles(MongoCollection dataCol) {
-            Iterable<TimesliceObject> allProfiles = dataCol.find("{},{'group.deliveryProfile': #}", 1).as(TimesliceObject.class);
-            Map<String, String> dProfiles = new HashMap<String, String>();
-            for (TimesliceObject ts : allProfiles) {
-                Map<String, String> group = ts.getGroup();
-                String deliveryProfile = group.get("deliveryProfile");
-                dProfiles.put(deliveryProfile, deliveryProfile);
-            }
-            return dProfiles;
-        }
 
 }

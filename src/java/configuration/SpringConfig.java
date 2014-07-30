@@ -1,7 +1,7 @@
 package configuration;
 
 //import collector.service.DispatchService;
-import collector.service.OplogDataCollector;
+import collector.domain.OplogDataCollector;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.module.scala.DefaultScalaModule;
 import com.mongodb.DB;

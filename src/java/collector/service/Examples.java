@@ -22,7 +22,7 @@ public class Examples {
     @Produces("application/json")
     @Path(value = "/types/")
     @Consumes(MediaType.TEXT_PLAIN)
-    public List<TimesliceObject> processRequest(String size) throws Exception{
+    public List<TimesliceObject> runOplogDataCollector(String size) throws Exception{
         String fixed = size.substring(5);
         if(fixed.isEmpty()){
             fixed = "ONE_DAY";
@@ -33,7 +33,7 @@ public class Examples {
     @GET
     @Produces("application/json")
     @Path(value = "/types/")
-    public List<TimesliceObject> processRequest() throws Exception{
+    public List<TimesliceObject> runOplogDataCollector() throws Exception{
         String defaultSize = "ONE_DAY";
         return compiledData.getType(defaultSize);
     }
@@ -41,7 +41,7 @@ public class Examples {
     *//*@POST
     @Path(value = "/db/")
     @Consumes(MediaType.TEXT_PLAIN)
-    public void processRequest(String dbName) throws Exception{
+    public void runOplogDataCollector(String dbName) throws Exception{
         String fixed = dbName.substring(7);
         oplogDataCollectorService.collectData(fixed);
     }*//*
