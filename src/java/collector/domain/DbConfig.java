@@ -12,6 +12,11 @@ import java.net.UnknownHostException;
  * Created by benjamin on 7/17/14.
  */
 public class DbConfig {
+
+
+
+
+
     public MongoCollection useJongo(String Host, int Port, String Db, String Col) throws UnknownHostException {
         MongoClient mongoClient = new MongoClient(Host, Port);
         DB db = mongoClient.getDB(Db);

@@ -2,7 +2,7 @@ package collector.service;
 
 import com.github.nhuray.dropwizard.spring.SpringBundle;
 import com.sun.jersey.api.core.ResourceConfig;
-import configuration.CollectorConfig;
+import spring.CollectorConfig;
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -28,7 +28,7 @@ public class CollectorApplication extends Application<CollectorConfig> {
     private ConfigurableApplicationContext applicationContext() throws BeansException {
         AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
         context.scan("collector");
-        context.scan("configuration");
+        context.scan("spring");
         return context;
     }
 
@@ -53,6 +53,4 @@ public class CollectorApplication extends Application<CollectorConfig> {
         });
     }
 
-
 }
-

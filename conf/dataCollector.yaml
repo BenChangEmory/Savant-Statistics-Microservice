@@ -1,8 +1,6 @@
 logging:
   level: DEBUG
 
-
-
 server:
   applicationConnectors:
     - type: http
@@ -10,3 +8,15 @@ server:
   adminConnectors:
     - type: http
       port: 7181
+
+mongoSource:
+    host: "10.0.0.151"
+    port: 27027
+
+mongoDestination:
+    host: "localhost"
+    port: 27017
+    database: "savant"
+
+targettedDb:
+    database: "realdocqa.dispatches"

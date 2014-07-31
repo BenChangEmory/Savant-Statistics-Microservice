@@ -5,31 +5,38 @@ import org.bson.types.BSONTimestamp;
 import org.bson.types.ObjectId;
 import org.jongo.MongoCollection;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import spring.CollectorConfig;
 
 /**
  * Created by benjamin on 6/30/14.
  */
 
 public class OplogDataCollector implements InitializingBean {
+
+    @Autowired
+    CollectorConfig collectorConfig;
+
     public void collectData(String dbNameInput) throws Exception{
         try {
+//            String dbNameInput = collectorConfig.getTargettedDb().getDatabase();
             DbConfig dbConfig = new DbConfig();
             //configurable fields
-            int destinationPort = 27017;
-            int sourcePort = 27027;
-            String destinationHost = "localhost";
-            String sourceHost = "10.0.0.151";
-            String destinationDb = "savant";
+            int destinationPort = collectorConfig.getMongoDestination().getPort();
+            int sourcePort = collectorConfig.getMongoSource().getPort();
+            String destinationHost = collectorConfig.getMongoDestination().getHost();
+            String sourceHost = collectorConfig.getMongoSource().getHost();
+            String destinationDb = collectorConfig.getMongoDestination().getDatabase();
             String sourceDb = "local";
-            String destinationOplogInfoCol = "generalData";
-            String destinationTimeSliceCol = "graphData";
+            String destinationGeneralDataCol = "generalData";
+            String destinationGraphDataCol = "graphData";
             String sourceOplog = "oplog.rs";
-            String tsInformation = "ts";
+            String tsCollection = "ts";
             String monitoredField  = "deliveryProfileCode";
 
-            MongoCollection generalData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationOplogInfoCol);
-            MongoCollection graphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationTimeSliceCol);
-            MongoCollection tsData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, tsInformation);
+            MongoCollection generalData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGeneralDataCol);
+            MongoCollection graphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGraphDataCol);
+            MongoCollection tsData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, tsCollection);
             DBCollection sourceCol = dbConfig.useDBCollection(sourceHost, sourcePort, sourceDb, sourceOplog);
 
             //filter and create cursor

@@ -1,4 +1,4 @@
-package configuration;
+package spring;
 
 import com.fasterxml.jackson.core.JsonParser;
 import org.codehaus.jackson.JsonProcessingException;
