@@ -1,6 +1,4 @@
 <!DOCTYPE html>
-<html>
-
 <head>
     <link rel="shortcut icon" href="file:///home/benjamin/Desktop/chart.ico">
     <base href="http://demos.telerik.com/kendo-ui/dropdownlist/remotedatasource">
@@ -76,12 +74,16 @@
 <div>
 <script>
             $(document).ready(function() {
+
                 $(document).ready(createChart);
-                // setInterval(function() {
-                //     softRefresh();
-                // }, 5000);
+
+                setInterval(function() {
+                    softRefresh();
+                }, 15000);
 
                 function softRefresh() {
+                    var chart = $('#chart').data("kendoChart");
+                    chart.options.transitions = false;
                     if (listOfClients.value().toString() != "" && listOfProfiles.value().toString() != "") {
                         dataSource.read();
                     } else {
@@ -91,14 +93,20 @@
 
                 function fullRefresh() {
                     adjustAxisLabels();
-                    postString = size + "/" + startDateUnix + "/" + endDateUnix + "/" + listOfClients.value().toString() + "/" + listOfProfiles.value().toString();
+                    postString = JSON.stringify({
+                        size: size,
+                        lowerTime: lowerDateUnix,
+                        upperTime: upperDateUnix,
+                        clients: listOfClients.value(),
+                        profiles: listOfProfiles.value()
+                    });
                     softRefresh();
                     createChart();
                 }
 
                 function adjustAxisLabels() {
                     var maxTicks = 15;
-                    var totalTicks = (endDateUnix - startDateUnix) / baseUnitStepUnix;
+                    var totalTicks = (upperDateUnix - lowerDateUnix) / baseUnitStepUnix;
                     var displayedTicks = totalTicks;
                     labelStep = 1;
                     while (displayedTicks > maxTicks) {
@@ -115,7 +123,7 @@
                         },
                         theme: "blueopal",
                         dataSource: dataSource,
-                        transitions: false,
+                        transitions: true,
                         series: [{
                             type: "line",
                             style: "smooth",
@@ -166,8 +174,8 @@
                 function startChange() {
                     var startDate = start.value(),
                         endDate = end.value();
-                    startDateUnix = Date.parse(startDate).getTime(),
-                        endDateUnix = Date.parse(endDate).getTime();
+                    lowerDateUnix = Date.parse(startDate).getTime(),
+                        upperDateUnix = Date.parse(endDate).getTime();
                     if (startDate) {
                         startDate = new Date(startDate);
                         startDate.setDate(startDate.getDate());
@@ -185,8 +193,8 @@
                 function endChange() {
                     var endDate = end.value(),
                         startDate = start.value();
-                    startDateUnix = Date.parse(startDate).getTime(),
-                        endDateUnix = Date.parse(endDate).getTime();
+                    lowerDateUnix = Date.parse(startDate).getTime(),
+                        upperDateUnix = Date.parse(endDate).getTime();
                     if (endDate) {
                         endDate = new Date(endDate);
                         endDate.setDate(endDate.getDate());
@@ -266,8 +274,8 @@
                 for (var i = 0, length = radios.length; i < length; i++) {
                     if (radios[i].checked) {
                         var size = radios[i].value,
-                            startDateUnix = Date.parse(start.value()).getTime(),
-                            endDateUnix = Date.parse(end.value()).getTime();
+                            lowerDateUnix = Date.parse(start.value()).getTime(),
+                            upperDateUnix = Date.parse(end.value()).getTime();
                         break;
                     }
                 }
@@ -275,12 +283,24 @@
                 var listOfClients = $("#clients").kendoMultiSelect().data("kendoMultiSelect");
                 var listOfProfiles = $("#profiles").kendoMultiSelect().data("kendoMultiSelect");
 
-                var postString = size + "/" + startDateUnix + "/" + endDateUnix + "/" + listOfClients.value().toString() + "/" + listOfProfiles.value().toString();
+                var postString = JSON.stringify({
+                    size: size,
+                    lowerTime: lowerDateUnix,
+                    upperTime: upperDateUnix,
+                    clients: listOfClients.value(),
+                    profiles: listOfProfiles.value()
+                });
                 var dataSource = new kendo.data.DataSource({
                     transport: {
                         read: function(options) {
-                            $.post("http://localhost:7180/statistics", postString, function(result) {
-                                options.success(result);
+                            $.ajax({
+                                type: 'POST',
+                                contentType: "application/json",
+                                data: postString,
+                                url: "http://localhost:7180/statistics",
+                                success: function(result) {
+                                    options.success(result);
+                                }
                             });
                         }
                     },
@@ -306,3 +326,4 @@
 </body>
 
 </html>
+                       

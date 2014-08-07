@@ -30,12 +30,14 @@ public class OplogDataCollector implements InitializingBean {
             String sourceDb = "local";
             String destinationGeneralDataCol = "generalData";
             String destinationGraphDataCol = "graphData";
+            String destinationStatusCreatedDtmGraphDataCol = "statusCreatedGraphData";
             String sourceOplog = "oplog.rs";
             String tsCollection = "ts";
             String monitoredField  = "deliveryProfileCode";
 
             MongoCollection generalData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGeneralDataCol);
             MongoCollection graphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGraphDataCol);
+            MongoCollection statusCreatedGraphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationStatusCreatedDtmGraphDataCol);
             MongoCollection tsData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, tsCollection);
             DBCollection sourceCol = dbConfig.useDBCollection(sourceHost, sourcePort, sourceDb, sourceOplog);
 
@@ -47,84 +49,98 @@ public class OplogDataCollector implements InitializingBean {
             Iterable<TimeEntry> iterableForTimeStart = tsData.find().limit(1).as(TimeEntry.class);
             BSONTimestamp initialStoredTimestamp = new BSONTimestamp(0, 0);
             if(iterableForTimeStart.iterator().hasNext()) {
-                TimeEntry entry = iterableForTimeStart.iterator().next();
-                initialStoredTimestamp = entry.getTs();
+                TimeEntry timeEntry = iterableForTimeStart.iterator().next();
+                initialStoredTimestamp = timeEntry.getTs();
             }
-//            startTs = new BSONTimestamp(1406552482, 11);
+//            initialStoredTimestamp = new BSONTimestamp(1406552482, 11);
             tailableCursorQuery.put("ts", new BasicDBObject("$gt", initialStoredTimestamp));
 
             DBCursor tailableCursor = sourceCol.find(tailableCursorQuery).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA)
                     .addOption(Bytes.QUERYOPTION_NOTIMEOUT).addOption(Bytes.QUERYOPTION_OPLOGREPLAY);
 
-            //NOTE tailableCursor.count() takes about 2 seconds to process
-            int processedCount = 0;
+            //NOTE tailableCursor.count() method takes about 2 seconds to process
             while(true){
 
-                long after;
-                long before = 0l;
-
                 while (tailableCursor.hasNext()) {
-
-                    processedCount++;
-                    if(processedCount != 1){
-                        after = System.currentTimeMillis();
-                        long processingTime = (after-before);
-                        System.out.println("processed in "+processingTime+" milliseconds");
-                    }
-                    before = System.currentTimeMillis();
-
                     //store data with cursor
-                    BasicDBObject document = (BasicDBObject)tailableCursor.next();
-                    //Long statusCreatedDtm = (Long)((BasicDBObject) (((BasicDBObject) document.get("o")).get("status"))).get("createdDtm");
-                    ObjectId objectId = (ObjectId)((BasicDBObject) document.get("o")).get("_id");
-                    Long createdDtm = (Long)((BasicDBObject) document.get("o")).get("createdDtm");
-                    String designatedMonitoredField = (String)((BasicDBObject) document.get("o")).get(monitoredField);
-                    String clientId = (String) (((BasicDBObject) document.get("o")).get("clientId"));
-                    String deliveryProfileCode = (String) (((BasicDBObject) document.get("o")).get("deliveryProfileCode"));
-                    String statusCode = null;
-                    if((((BasicDBObject) document.get("o")).get("status"))!=null) {
-                        statusCode = (String) ((BasicDBObject) (((BasicDBObject) document.get("o")).get("status"))).get("code");
+                    BasicDBObject oplogDocument = (BasicDBObject)tailableCursor.next();
+                    ObjectId objectId = (ObjectId)((BasicDBObject) oplogDocument.get("o")).get("_id");
+                    Long objectCreatedDtm = (Long)((BasicDBObject) oplogDocument.get("o")).get("createdDtm");
+                    String objectMonitoredField = (String)((BasicDBObject) oplogDocument.get("o")).get(monitoredField);
+                    String objectClientId = (String) (((BasicDBObject) oplogDocument.get("o")).get("clientId"));
+                    String objectdeliveryProfileCode = (String) (((BasicDBObject) oplogDocument.get("o")).get("deliveryProfileCode"));
+                    String objectStatusCode = null;
+                    Long objectStatusCreatedDtm = null;
+                    if((((BasicDBObject) oplogDocument.get("o")).get("status"))!=null) {
+                        objectStatusCode = (String) ((BasicDBObject) (((BasicDBObject) oplogDocument.get("o")).get("status"))).get("code");
+                        objectStatusCreatedDtm = (Long) ((BasicDBObject) (((BasicDBObject) oplogDocument.get("o")).get("status"))).get("createdDtm");
                     }
 
                     //update generalData
                     generalData.update("{'_id': #}", objectId).upsert()
-                            .with("{$set: {createdDtm: #, "+ monitoredField +": #}}", createdDtm, designatedMonitoredField);
+                            .with("{$set: {createdDtm: #, "+ monitoredField +": #}}", objectCreatedDtm, objectMonitoredField);
                     //update graphData
                     long currentTime = System.currentTimeMillis();
                     for(Timeslices slice: Timeslices.values()) {
                         long sizeIncrements = slice.value;
                         for (long currentTimeSegment = 0l; currentTimeSegment < currentTime; currentTimeSegment += sizeIncrements) {
-                            if (createdDtm != null) {
-                                if (createdDtm >= currentTimeSegment && createdDtm < currentTimeSegment + sizeIncrements) {
+                            if (objectCreatedDtm != null) {
+                                if (objectCreatedDtm >= currentTimeSegment && objectCreatedDtm < currentTimeSegment + sizeIncrements) {
                                     graphData.update("{'slice': #,'group': {status: #, 'client': #, 'deliveryProfile': #}, 'size': #}",
-                                            currentTimeSegment, statusCode, clientId, deliveryProfileCode, slice.name())
+                                            currentTimeSegment, objectStatusCode, objectClientId, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {status: #, 'client': #}, 'size': #}",
-                                            currentTimeSegment, statusCode, clientId,  slice.name())
+                                            currentTimeSegment, objectStatusCode, objectClientId,  slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {status: #, 'deliveryProfile': #}, 'size': #}",
-                                            currentTimeSegment, statusCode, deliveryProfileCode, slice.name())
+                                            currentTimeSegment, objectStatusCode, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {'client': #, 'deliveryProfile': #}, 'size': #}",
-                                            currentTimeSegment, clientId, deliveryProfileCode, slice.name())
+                                            currentTimeSegment, objectClientId, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {'client': #}, 'size': #}",
-                                            currentTimeSegment, clientId, slice.name())
+                                            currentTimeSegment, objectClientId, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {'deliveryProfile': #}, 'size': #}",
-                                            currentTimeSegment, deliveryProfileCode, slice.name())
+                                            currentTimeSegment, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {status: #}, 'size': #}",
-                                            currentTimeSegment, statusCode, slice.name())
+                                            currentTimeSegment, objectStatusCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                }
+                            }
+                        }
+                        for (long currentTimeSegment = 0l; currentTimeSegment < currentTime; currentTimeSegment += sizeIncrements) {
+                            if (objectStatusCreatedDtm != null) {
+                                if (objectStatusCreatedDtm >= currentTimeSegment && objectStatusCreatedDtm < currentTimeSegment + sizeIncrements) {
+                                    statusCreatedGraphData.update("{'slice': #,'group': {status: #, 'client': #, 'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, objectStatusCode, objectClientId, objectdeliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {status: #, 'client': #}, 'size': #}",
+                                            currentTimeSegment, objectStatusCode, objectClientId,  slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {status: #, 'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, objectStatusCode, objectdeliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {'client': #, 'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, objectClientId, objectdeliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {'client': #}, 'size': #}",
+                                            currentTimeSegment, objectClientId, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {'deliveryProfile': #}, 'size': #}",
+                                            currentTimeSegment, objectdeliveryProfileCode, slice.name())
+                                            .upsert().with("{$inc: {count: 1}}");
+                                    statusCreatedGraphData.update("{'slice': #,'group': {status: #}, 'size': #}",
+                                            currentTimeSegment, objectStatusCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                 }
                             }
                         }
                     }
                     //create or update tsData
-                    BSONTimestamp ts = (BSONTimestamp) document.get("ts");
+                    BSONTimestamp ts = (BSONTimestamp) oplogDocument.get("ts");
                     tsData.update("{_id: #}", null).upsert().with("{$set: {ts: #}}", ts);
-
                 }
             }
         }  catch (MongoException e) {

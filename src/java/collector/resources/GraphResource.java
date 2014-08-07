@@ -1,6 +1,7 @@
 package collector.resources;
 
 import collector.domain.CompiledData;
+import collector.domain.GraphRequest;
 import collector.domain.TimesliceObject;
 import com.wordnik.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,87 +27,57 @@ public class GraphResource {
 
     @POST
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByStatusClientDeliveryProfile(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] clientInput = arrayInput[3].split(",");
-        String[] profileInput = arrayInput[4].split(",");
-        return compiledData.getDataGroupedByStatusClientDeliveryProfile(lowerTimeInput, upperTimeInput, sizeInput, clientInput, profileInput);
-    }
-
-
-    @POST
-    @Path("/client_deliveryprofile")
-    @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByClientDeliveryProfile(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] clientInput = arrayInput[3].split(",");
-        String[] profileInput = arrayInput[4].split(",");
-        return compiledData.getDataGroupedByClientDeliveryProfile(lowerTimeInput, upperTimeInput, sizeInput, clientInput, profileInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByStatusClientDeliveryProfile(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByStatusClientDeliveryProfile(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getClients(), input.getProfiles());
     }
 
     @POST
-    @Path("/status_deliveryprofile")
+    @Path(value = "/client_deliveryprofile/")
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByStatusDeliveryProfile(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] profileInput = arrayInput[3].split(",");
-        return compiledData.getDataGroupedByStatusDeliveryProfile(lowerTimeInput, upperTimeInput, sizeInput, profileInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByClientDeliveryProfile(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByClientDeliveryProfile(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getClients(), input.getProfiles());
     }
 
     @POST
-    @Path("/status_client")
+    @Path(value = "/status_deliveryprofile/")
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByStatusClient(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] clientInput = arrayInput[3].split(",");
-        return compiledData.getDataGroupedByStatusClient(lowerTimeInput, upperTimeInput, sizeInput, clientInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByStatusDeliveryProfile(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByStatusDeliveryProfile(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getProfiles());
     }
 
     @POST
-    @Path("/status")
+    @Path(value = "/status_client/")
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByStatus(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        return compiledData.getDataGroupedByStatus(lowerTimeInput, upperTimeInput, sizeInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByStatusClient(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByStatusClient(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getClients());
     }
 
     @POST
-    @Path("/client")
+    @Path(value = "/status/")
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByClient(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] clientInput = arrayInput[3].split(",");
-        return compiledData.getDataGroupedByClient(lowerTimeInput, upperTimeInput, sizeInput, clientInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByStatus(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByStatus(input.getLowerTime(), input.getUpperTime(), input.getSize());
     }
 
     @POST
-    @Path("/deliveryprofile")
+    @Path(value = "/client/")
     @Produces("application/json")
-    public List<TimesliceObject> getDataGroupedByDeliveryProfile(String input) throws Exception{
-        String[] arrayInput = input.split("/");
-        String sizeInput = arrayInput[0];
-        long lowerTimeInput = Long.parseLong(arrayInput[1]);
-        long upperTimeInput = Long.parseLong(arrayInput[2]);
-        String[] profileInput = arrayInput[3].split(",");
-        return compiledData.getDataGroupedByDeliveryProfile(lowerTimeInput, upperTimeInput, sizeInput, profileInput);
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByClient(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByClient(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getClients());
+    }
+
+    @POST
+    @Path(value = "/deliveryprofile/")
+    @Produces("application/json")
+    @Consumes("application/json")
+    public List<TimesliceObject> getDataGroupedByDeliveryProfile(GraphRequest input) throws Exception{
+        return compiledData.getDataGroupedByDeliveryProfile(input.getLowerTime(), input.getUpperTime(), input.getSize(), input.getProfiles());
     }
 
 }

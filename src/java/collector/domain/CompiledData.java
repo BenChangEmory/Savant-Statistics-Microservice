@@ -163,7 +163,7 @@ public class CompiledData {
 
 
 
-    Map<String, String> getAllExistingStatusesInMongo(MongoCollection dataCol) {
+     Map<String, String> getAllExistingStatusesInMongo(MongoCollection dataCol) {
         Iterable<TimesliceObject> statusData = dataCol.find("{},{'group.status': #}", 1).as(TimesliceObject.class);
         Map<String, String> compiledStatuses = new HashMap<String, String>();
         for (TimesliceObject data : statusData) {
@@ -173,7 +173,6 @@ public class CompiledData {
         }
         return compiledStatuses;
     }
-
     Map<String,String> getAllExistingProfilesInMongo(MongoCollection dataCol) {
         Iterable<TimesliceObject> allProfiles = dataCol.find("{},{'group.deliveryProfile': #}", 1).as(TimesliceObject.class);
         Map<String, String> profiles = new HashMap<String, String>();
