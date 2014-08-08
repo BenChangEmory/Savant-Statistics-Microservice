@@ -24,7 +24,7 @@ public class GraphResource {
     @Autowired
     CompiledData compiledData;
 
-
+//TODO: make more RESTful
     @POST
     @Produces("application/json")
     @Consumes("application/json")

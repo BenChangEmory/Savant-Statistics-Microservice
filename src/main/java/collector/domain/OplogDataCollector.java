@@ -17,7 +17,7 @@ public class OplogDataCollector implements InitializingBean {
     @Autowired
     CollectorConfig collectorConfig;
 
-    public void collectData(String dbNameInput) throws Exception{
+    public void collectData(String dbNameInput) throws Exception {
         try {
 //            String dbNameInput = collectorConfig.getTargettedDb().getDatabase();
             DbConfig dbConfig = new DbConfig();
@@ -33,7 +33,7 @@ public class OplogDataCollector implements InitializingBean {
             String destinationStatusCreatedDtmGraphDataCol = "statusCreatedGraphData";
             String sourceOplog = "oplog.rs";
             String tsCollection = "ts";
-            String monitoredField  = "deliveryProfileCode";
+            String monitoredField = "deliveryProfileCode";
 
             MongoCollection generalData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGeneralDataCol);
             MongoCollection graphData = dbConfig.useJongo(destinationHost, destinationPort, destinationDb, destinationGraphDataCol);
@@ -46,51 +46,58 @@ public class OplogDataCollector implements InitializingBean {
             tailableCursorQuery.put("ns", dbNameInput);
             tailableCursorQuery.put("op", new BasicDBObject("$in", new String[]{"u", "i"}));
 
-            Iterable<TimeEntry> iterableForTimeStart = tsData.find().limit(1).as(TimeEntry.class);
-            BSONTimestamp initialStoredTimestamp = new BSONTimestamp(0, 0);
-            if(iterableForTimeStart.iterator().hasNext()) {
-                TimeEntry timeEntry = iterableForTimeStart.iterator().next();
+            TimeEntry timeEntry = tsData.findOne().as(TimeEntry.class);
+            BSONTimestamp initialStoredTimestamp;
+            if (timeEntry != null) {
                 initialStoredTimestamp = timeEntry.getTs();
+            } else {
+                initialStoredTimestamp = new BSONTimestamp(0, 0);
             }
-//            initialStoredTimestamp = new BSONTimestamp(1406552482, 11);
-            tailableCursorQuery.put("ts", new BasicDBObject("$gt", initialStoredTimestamp));
 
-            DBCursor tailableCursor = sourceCol.find(tailableCursorQuery).addOption(Bytes.QUERYOPTION_TAILABLE).addOption(Bytes.QUERYOPTION_AWAITDATA)
-                    .addOption(Bytes.QUERYOPTION_NOTIMEOUT).addOption(Bytes.QUERYOPTION_OPLOGREPLAY);
+            tailableCursorQuery.put("ts", new BasicDBObject("$gt", initialStoredTimestamp));
+            //note query status so that it is not null
+
+
+            DBCursor tailableCursor = sourceCol.find(tailableCursorQuery)
+                    .addOption(Bytes.QUERYOPTION_TAILABLE)
+                    .addOption(Bytes.QUERYOPTION_AWAITDATA)
+                    .addOption(Bytes.QUERYOPTION_NOTIMEOUT)
+                    .addOption(Bytes.QUERYOPTION_OPLOGREPLAY);
 
             //NOTE tailableCursor.count() method takes about 2 seconds to process
-            while(true){
+            while (true) {
 
                 while (tailableCursor.hasNext()) {
                     //store data with cursor
-                    BasicDBObject oplogDocument = (BasicDBObject)tailableCursor.next();
-                    ObjectId objectId = (ObjectId)((BasicDBObject) oplogDocument.get("o")).get("_id");
-                    Long objectCreatedDtm = (Long)((BasicDBObject) oplogDocument.get("o")).get("createdDtm");
-                    String objectMonitoredField = (String)((BasicDBObject) oplogDocument.get("o")).get(monitoredField);
+                    BasicDBObject oplogDocument = (BasicDBObject) tailableCursor.next();
+                    ObjectId objectId = (ObjectId) ((BasicDBObject) oplogDocument.get("o")).get("_id");
+                    Long objectCreatedDtm = (Long) ((BasicDBObject) oplogDocument.get("o")).get("createdDtm");
+                    String objectMonitoredField = (String) ((BasicDBObject) oplogDocument.get("o")).get(monitoredField);
                     String objectClientId = (String) (((BasicDBObject) oplogDocument.get("o")).get("clientId"));
                     String objectdeliveryProfileCode = (String) (((BasicDBObject) oplogDocument.get("o")).get("deliveryProfileCode"));
                     String objectStatusCode = null;
                     Long objectStatusCreatedDtm = null;
-                    if((((BasicDBObject) oplogDocument.get("o")).get("status"))!=null) {
+                    if ((((BasicDBObject) oplogDocument.get("o")).get("status")) != null) {
                         objectStatusCode = (String) ((BasicDBObject) (((BasicDBObject) oplogDocument.get("o")).get("status"))).get("code");
                         objectStatusCreatedDtm = (Long) ((BasicDBObject) (((BasicDBObject) oplogDocument.get("o")).get("status"))).get("createdDtm");
                     }
 
                     //update generalData
                     generalData.update("{'_id': #}", objectId).upsert()
-                            .with("{$set: {createdDtm: #, "+ monitoredField +": #}}", objectCreatedDtm, objectMonitoredField);
+                            .with("{$set: {createdDtm: #, " + monitoredField + ": #}}", objectCreatedDtm, objectMonitoredField);
                     //update graphData
                     long currentTime = System.currentTimeMillis();
-                    for(Timeslices slice: Timeslices.values()) {
+                    for (Timeslices slice : Timeslices.values()) {
                         long sizeIncrements = slice.value;
                         for (long currentTimeSegment = 0l; currentTimeSegment < currentTime; currentTimeSegment += sizeIncrements) {
                             if (objectCreatedDtm != null) {
+                                //TODO: get rid of these loops and put in hashing algorithm to bucket the time slice
                                 if (objectCreatedDtm >= currentTimeSegment && objectCreatedDtm < currentTimeSegment + sizeIncrements) {
                                     graphData.update("{'slice': #,'group': {status: #, 'client': #, 'deliveryProfile': #}, 'size': #}",
                                             currentTimeSegment, objectStatusCode, objectClientId, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {status: #, 'client': #}, 'size': #}",
-                                            currentTimeSegment, objectStatusCode, objectClientId,  slice.name())
+                                            currentTimeSegment, objectStatusCode, objectClientId, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     graphData.update("{'slice': #,'group': {status: #, 'deliveryProfile': #}, 'size': #}",
                                             currentTimeSegment, objectStatusCode, objectdeliveryProfileCode, slice.name())
@@ -117,7 +124,7 @@ public class OplogDataCollector implements InitializingBean {
                                             currentTimeSegment, objectStatusCode, objectClientId, objectdeliveryProfileCode, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     statusCreatedGraphData.update("{'slice': #,'group': {status: #, 'client': #}, 'size': #}",
-                                            currentTimeSegment, objectStatusCode, objectClientId,  slice.name())
+                                            currentTimeSegment, objectStatusCode, objectClientId, slice.name())
                                             .upsert().with("{$inc: {count: 1}}");
                                     statusCreatedGraphData.update("{'slice': #,'group': {status: #, 'deliveryProfile': #}, 'size': #}",
                                             currentTimeSegment, objectStatusCode, objectdeliveryProfileCode, slice.name())
@@ -140,18 +147,17 @@ public class OplogDataCollector implements InitializingBean {
                     }
                     //create or update tsData
                     BSONTimestamp ts = (BSONTimestamp) oplogDocument.get("ts");
-                    tsData.update("{_id: #}", null).upsert().with("{$set: {ts: #}}", ts);
+                    tsData.update("{_id: #}", "lastEntryProcessedTimestamp").upsert().with("{$set: {ts: #}}", ts);
                 }
             }
-        }  catch (MongoException e) {
+        } catch (MongoException e) {
             e.printStackTrace();
         }
     }
 
 
-
     @Override
-    public void afterPropertiesSet() throws Exception{
+    public void afterPropertiesSet() throws Exception {
     }
 
 
