@@ -27,5 +27,5 @@ between the upper and lower values, for size, for client(s), and for delivery pr
 array.
 
 4. Other POST endpoints are the following:
-/statistics, /client_deliveryprofile, /statistics, /status_deliveryprofile, /statistics, /status_client, /statistics/status, /statistics, /client, /statistics/deliveryprofile
+/statistics, /client_deliveryprofile, /statistics, /status_deliveryprofile, /statistics, /status_client, /statistics, /status, /statistics, /client, /statistics, /deliveryprofile
 ￼￼￼￼￼￼
