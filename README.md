@@ -1,3 +1,5 @@
+Savant
+-----
 This is the Savant, the statistics service. The backend service (Java) puts a tailable cursor onto the oplog of a targetted database. Oplogs are created when a database uses replica sets and capture all the actions that occur within a database. This is a more reliable way of capturing data rather that look directly into a collection because of the discrepancies between when an action occurs and when the action is logged. The tailable cursor does not expire, so it will continuously read off the database until the program is ended.  
 
 The data is then aggregated into time slots under different categories in a way that is meaningful to the business and stored into a separate collection on the server. This collection is accessed by the front end by utilizing REST endpoints to call methods. The data is sent to the UI in the form of a JSON.
